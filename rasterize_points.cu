@@ -160,7 +160,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   torch::Tensor dL_dmeans3D = torch::zeros({P, 3}, means3D.options());
   torch::Tensor dL_dmeans2D = torch::zeros({P, 3}, means3D.options());
   torch::Tensor dL_dcolors = torch::zeros({P, NUM_COLOR_CHANNELS}, means3D.options());
-  torch::Tensor dL_dfeatures = torch::zeros({P, features.size(1), NUM_FEATURE_CHANNELS}, means3D.options());
+  torch::Tensor dL_dfeatures = torch::zeros({P, NUM_FEATURE_CHANNELS}, means3D.options());
   torch::Tensor dL_dconic = torch::zeros({P, 2, 2}, means3D.options());
   torch::Tensor dL_dopacity = torch::zeros({P, 1}, means3D.options());
   torch::Tensor dL_dcov3D = torch::zeros({P, 6}, means3D.options());
