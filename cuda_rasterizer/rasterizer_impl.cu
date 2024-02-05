@@ -399,8 +399,9 @@ void CudaRasterizer::Rasterizer::backward(
 	// opacity and RGB of Gaussians from per-pixel loss gradients.
 	// If we were given precomputed colors and not SHs, use them.
 	const float* color_ptr = (colors_precomp != nullptr) ? colors_precomp : geomState.rgb;
-	float* collected_features; 
-	cudaMalloc((void**)&collected_features, NUM_FEATURE_CHANNELS * BLOCK_SIZE * sizeof(float)); 
+	float* collected_features = nullptr;
+	if (features)
+		cudaMalloc((void**)&collected_features, NUM_FEATURE_CHANNELS * BLOCK_SIZE * sizeof(float)); 
 	CHECK_CUDA(BACKWARD::render(
 		tile_grid,
 		block,
