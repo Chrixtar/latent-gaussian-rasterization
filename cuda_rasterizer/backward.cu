@@ -463,7 +463,7 @@ renderCUDA(
 		for (int i = 0; i < C; i++)
 			dL_dpixel[i] = dL_dpixels[i * H * W + pix_id];
 	
-	extern __shared__ float collected_features[NUM_FEATURE_CHANNELS * BLOCK_SIZE];
+	extern __shared__ float collected_features[];
 	float accum_rec_feature[NUM_FEATURE_CHANNELS] = { 0 };
 	float dL_dfeaturepixel[NUM_FEATURE_CHANNELS];
 	float last_feature[NUM_FEATURE_CHANNELS] = { 0 };
@@ -681,9 +681,9 @@ void BACKWARD::render(
 	float* dL_dfeatures) 
 	
 {	
-	// allow NUM_FEATURE_CHANNELS up to 64 with BLOCK_SIZE 16*16
-	cudaFuncSetAttribute(renderCUDA<NUM_COLOR_CHANNELS>, cudaFuncAttributeMaxDynamicSharedMemorySize, 65536);
-	renderCUDA<NUM_COLOR_CHANNELS> << <grid, block, NUM_FEATURE_CHANNELS * BLOCK_SIZE >> >(
+	// allow NUM_FEATURE_CHANNELS up to 64 with BLOCK_SIZE 16*16 with 4 bytes for float
+	cudaFuncSetAttribute(renderCUDA<NUM_COLOR_CHANNELS>, cudaFuncAttributeMaxDynamicSharedMemorySize, NUM_FEATURE_CHANNELS * BLOCK_SIZE * 4);
+	renderCUDA<NUM_COLOR_CHANNELS> << <grid, block, NUM_FEATURE_CHANNELS * BLOCK_SIZE * 4 >> >(
 		ranges,
 		point_list,
 		W, H,
