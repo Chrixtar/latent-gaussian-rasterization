@@ -426,8 +426,7 @@ renderCUDA(
 	float4* __restrict__ dL_dconic2D,
 	float* __restrict__ dL_dopacity,
 	float* __restrict__ dL_dcolors,
-	float* __restrict__ dL_dfeatures, 
-	float* collected_features) 
+	float* __restrict__ dL_dfeatures) 
 {
 	// We rasterize again. Compute necessary block info.
 	auto block = cg::this_thread_block();
@@ -662,8 +661,7 @@ void BACKWARD::render(
 	float4* dL_dconic2D,
 	float* dL_dopacity,
 	float* dL_dcolors,
-	float* dL_dfeatures, 
-	float* collected_features) 
+	float* dL_dfeatures) 
 	
 {
 	renderCUDA<NUM_COLOR_CHANNELS> << <grid, block >> >(
@@ -683,7 +681,6 @@ void BACKWARD::render(
 		dL_dconic2D,
 		dL_dopacity,
 		dL_dcolors,
-		dL_dfeatures, 
-		collected_features 
+		dL_dfeatures 
 		);
 }

@@ -398,9 +398,6 @@ void CudaRasterizer::Rasterizer::backward(
 	// opacity and RGB of Gaussians from per-pixel loss gradients.
 	// If we were given precomputed colors and not SHs, use them.
 	const float* color_ptr = (colors_precomp != nullptr) ? colors_precomp : geomState.rgb;
-	float* collected_features = nullptr;
-	if (features)
-		cudaMalloc((void**)&collected_features, NUM_FEATURE_CHANNELS * BLOCK_SIZE * sizeof(float)); 
 	CHECK_CUDA(BACKWARD::render(
 		tile_grid,
 		block,
@@ -420,11 +417,7 @@ void CudaRasterizer::Rasterizer::backward(
 		(float4*)dL_dconic,
 		dL_dopacity,
 		dL_dcolor,
-		dL_dfeatures, 
-		collected_features), debug) 
-		cudaFree(collected_features);
-
-
+		dL_dfeatures), debug) 
 
 	// Take care of the rest of preprocessing. Was the precomputed covariance
 	// given to us or a scales/rot pair? If precomputed, pass that. If not,
