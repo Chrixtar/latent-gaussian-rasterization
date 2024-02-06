@@ -456,14 +456,17 @@ renderCUDA(
 	__shared__ float2 collected_xy[BLOCK_SIZE];
 	__shared__ float4 collected_conic_opacity[BLOCK_SIZE];
 	__shared__ float collected_colors[C * BLOCK_SIZE];
-	float accum_rec[C] = { 0 };
+	float accum_rec_color[C] = { 0 };
 	float dL_dpixel[C];
 	float last_color[C] = { 0 };
 	if (inside)
 		for (int i = 0; i < C; i++)
 			dL_dpixel[i] = dL_dpixels[i * H * W + pix_id];
-		
+	
+	extern __shared__ float collected_features[NUM_FEATURE_CHANNELS * BLOCK_SIZE];
+	float accum_rec_feature[NUM_FEATURE_CHANNELS] = { 0 };
 	float dL_dfeaturepixel[NUM_FEATURE_CHANNELS];
+	float last_feature[NUM_FEATURE_CHANNELS] = { 0 };
 	if (features && inside)
 		for (int i = 0; i < NUM_FEATURE_CHANNELS; i++) 
 			dL_dfeaturepixel[i] = dL_dfeaturepixels[i * H * W + pix_id];
@@ -493,6 +496,9 @@ renderCUDA(
 			collected_conic_opacity[block.thread_rank()] = conic_opacity[coll_id];
 			for (int i = 0; i < C; i++)
 				collected_colors[i * BLOCK_SIZE + block.thread_rank()] = colors[coll_id * C + i];
+			if (features)
+				for (int i = 0; i < NUM_FEATURE_CHANNELS; i++)
+					collected_features[i * BLOCK_SIZE + block.thread_rank()] = colors[coll_id * NUM_FEATURE_CHANNELS + i];
 		}
 		block.sync();
 
@@ -525,25 +531,36 @@ renderCUDA(
 			// pair).
 			float dL_dalpha = 0.0f;
 			const int global_id = collected_id[j];
-			const float dchannel_dcolor = alpha * T;
+			const float dchannel_dpixel = alpha * T;
 			for (int ch = 0; ch < C; ch++)
 			{
 				const float c = collected_colors[ch * BLOCK_SIZE + j];
 				// Update last color (to be used in the next iteration)
-				accum_rec[ch] = last_alpha * last_color[ch] + (1.f - last_alpha) * accum_rec[ch];
+				accum_rec_color[ch] = last_alpha * last_color[ch] + (1.f - last_alpha) * accum_rec_color[ch];
 				last_color[ch] = c;
 
 				const float dL_dchannel = dL_dpixel[ch];
-				dL_dalpha += (c - accum_rec[ch]) * dL_dchannel;
+				dL_dalpha += (c - accum_rec_color[ch]) * dL_dchannel;
 				// Update the gradients w.r.t. color of the Gaussian. 
 				// Atomic, since this pixel is just one of potentially
 				// many that were affected by this Gaussian.
-				atomicAdd(&(dL_dcolors[global_id * C + ch]), dchannel_dcolor * dL_dchannel);
+				atomicAdd(&(dL_dcolors[global_id * C + ch]), dchannel_dpixel * dL_dchannel);
 			}
 			if (features)
-				for (int ch = 0; ch < NUM_FEATURE_CHANNELS; ch++) 
-					// Do not update alpha gradient, but use colors only for 3D consistency
-					atomicAdd(&(dL_dfeatures[global_id * NUM_FEATURE_CHANNELS + ch]), dchannel_dcolor * dL_dfeaturepixel[ch]); 			
+				for (int ch = 0; ch < NUM_FEATURE_CHANNELS; ch++)
+				{
+					const float f = collected_features[ch * BLOCK_SIZE + j];
+					// Update last feature (to be used in the next iteration)
+					accum_rec_feature[ch] = last_alpha * last_feature[ch] + (1.f - last_alpha) * accum_rec_feature[ch];
+					last_feature[ch] = f;
+
+					const float dL_dchannel = dL_dfeaturepixel[ch];
+					dL_dalpha += (f - accum_rec_feature[ch]) * dL_dchannel;
+					// Update the gradients w.r.t. feature of the Gaussian. 
+					// Atomic, since this pixel is just one of potentially
+					// many that were affected by this Gaussian.
+					atomicAdd(&(dL_dfeatures[global_id * NUM_FEATURE_CHANNELS + ch]), dchannel_dpixel * dL_dchannel);
+				}	
 
 			dL_dalpha *= T;
 			// Update last alpha (to be used in the next iteration)
@@ -663,8 +680,10 @@ void BACKWARD::render(
 	float* dL_dcolors,
 	float* dL_dfeatures) 
 	
-{
-	renderCUDA<NUM_COLOR_CHANNELS> << <grid, block >> >(
+{	
+	// allow NUM_FEATURE_CHANNELS up to 64 with BLOCK_SIZE 16*16
+	cudaFuncSetAttribute(renderCUDA<NUM_COLOR_CHANNELS>, cudaFuncAttributeMaxDynamicSharedMemorySize, 65536);
+	renderCUDA<NUM_COLOR_CHANNELS> << <grid, block, NUM_FEATURE_CHANNELS * BLOCK_SIZE >> >(
 		ranges,
 		point_list,
 		W, H,
