@@ -1,6 +1,7 @@
 # Modifications
 
 - Spherical harmonics match e3nn now.
+- Return alpha mask and depth, and allow gradients through them
 - Optional rasterization of high-dimensional features
 
 # Differential Gaussian Rasterization
