@@ -2,7 +2,7 @@
 
 - Spherical harmonics match e3nn now.
 - Return alpha mask and depth, and allow gradients through them
-- Optional rasterization of high-dimensional features
+- Optional rasterization of high-dimensional features and allow gradients to all Gaussian parameters (including structural ones)
 
 # Differential Gaussian Rasterization
 
